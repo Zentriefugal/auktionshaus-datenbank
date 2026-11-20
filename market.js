@@ -25,7 +25,7 @@ function suggestItems(){
       matches.push([id,name]);if(matches.length===100)break;
     }
   }
-  $('choices').replaceChildren(...matches.map(([id,name])=>option(name+' · '+id,String(id))));
+  $('choices').replaceChildren(...matches.map(([id,name])=>option('['+id+'] '+name,String(id))));
 }
 function choose(){
   const q=$('look').value.trim().toLocaleLowerCase('de');
@@ -33,7 +33,7 @@ function choose(){
   const id=/^\d+$/.test(q)?Number(q):exact.length===1?exact[0][0]:$('choices').options.length===1?Number($('choices').value):null;
   chosen=id;drawHistory();
 }
-function drawChart(points){
+function drawChart(points,start,end){
   const host=$('chart');host.replaceChildren();
   if(!points.some(p=>p.s))return;
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 840 195');svg.setAttribute('role','img');svg.setAttribute('aria-label','Stückpreise in Kupfer im Zeitverlauf');host.append(svg);
@@ -41,7 +41,6 @@ function drawChart(points){
     const node=document.createElementNS(svg.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,String(v));if(label!=null)node.textContent=label;svg.append(node);return node;
   }
   let max=0;for(const p of points)if(p.s)max=Math.max(max,p.s[1],p.s[2]);
-  const start=points[0].t,end=points.at(-1).t;
   const x=t=>end===start?435:76+730*(t-start)/(end-start),y=v=>145-117*v/(max||1);
   for(const fraction of [0,.5,1]){const v=fraction*max;shape('line',{x1:70,x2:813,y1:y(v),y2:y(v),stroke:'#3a4a49'});shape('text',{x:65,y:y(v)+4,'text-anchor':'end'},number(+v.toFixed(2)))}
   shape('text',{x:70,y:16},'Kupfer / Stück');
@@ -56,11 +55,38 @@ function drawChart(points){
   }
   shape('text',{x:75,y:178},dateTime(start));if(start!==end)shape('text',{x:813,y:178,'text-anchor':'end'},dateTime(end));
 }
+let period='week';
+const periodTabs=[...document.querySelectorAll('.periods [role="tab"]')];
+function setPeriod(button){
+  period=button.dataset.period;
+  for(const tab of periodTabs){
+    tab.setAttribute('aria-selected',String(tab===button));tab.tabIndex=tab===button?0:-1;
+  }
+  $('chartPanel').setAttribute('aria-labelledby',button.id);
+  drawHistory();
+}
+for(const [i,button] of periodTabs.entries()){
+  button.onclick=()=>setPeriod(button);
+  button.onkeydown=e=>{
+    const destinations={Home:0,End:3,ArrowLeft:(i+3)%4,ArrowRight:(i+1)%4};
+    if(!(e.key in destinations))return;
+    e.preventDefault();const next=periodTabs[destinations[e.key]];setPeriod(next);next.focus();
+  };
+}
+function rangeStart(end){
+  if(period==='day'||period==='week')return end-(period==='day'?1:7)*86400;
+  const date=new Date(end*1000),day=date.getUTCDate();
+  date.setUTCDate(1);date.setUTCMonth(date.getUTCMonth()-(period==='month'?1:12));
+  const lastDay=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,0)).getUTCDate();
+  date.setUTCDate(Math.min(day,lastDay));return date.getTime()/1000;
+}
 function drawHistory(){
-  const pts=marketViews.map(v=>({t:v.timestamp,s:v.stats[chosen]})),known=itemNames.has(chosen);
-  $('histname').textContent=known?itemNames.get(chosen)+' · '+chosen:'Gegenstand auswählen';
+  const end=marketViews.at(-1)?.timestamp??0,start=rangeStart(end);
+  const pts=marketViews.filter(v=>v.timestamp>=start).map(v=>({t:v.timestamp,s:v.stats[chosen]})),known=itemNames.has(chosen);
+  $('histname').textContent=known?'['+chosen+'] '+itemNames.get(chosen):'Gegenstand auswählen';
   $('histnote').textContent=known?'Gold: Ø Gesamtangebot · Grün: Ø günstigste 5 % des Volumens.':'Suche nach Name oder Item-ID und wähle einen Treffer.';
-  drawChart(known?pts:[]);$('histrows').replaceChildren();
+  drawChart(known?pts:[],start,end);
+  if(known&&!pts.some(p=>p.s))$('chart').textContent='Für diesen Gegenstand gibt es im gewählten Zeitraum kein Angebot.';$('histrows').replaceChildren();
   if(!known)return;
   for(const p of pts.reverse()){
     const tr=el('tr');for(const v of [dateTime(p.t),p.s?number(p.s[0]):'Kein Angebot',p.s?number(p.s[3]):'—',money(p.s?.[1]),money(p.s?.[2])])tr.append(el('td',v));$('histrows').append(tr);
