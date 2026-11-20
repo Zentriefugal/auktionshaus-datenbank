@@ -25,7 +25,7 @@ function suggestItems(){
       matches.push([id,name]);if(matches.length===100)break;
     }
   }
-  $('choices').replaceChildren(...matches.map(([id,name])=>option('['+id+'] '+name,String(id))));
+  $('choices').replaceChildren(...matches.map(([id,name])=>option(name,String(id))));
 }
 function choose(){
   const q=$('look').value.trim().toLocaleLowerCase('de');
