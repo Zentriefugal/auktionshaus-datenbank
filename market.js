@@ -35,7 +35,7 @@ function choose(){
 }
 const chartSeries=[
   {index:1,color:'#e5bf72',label:'Ø Gesamtangebot'},
-  {index:2,color:'#8bdfae',label:'Ø günstigste 5%'}
+  {index:2,color:'#8bdfae',label:'Ø günstigste 5 % des Volumens'}
 ];
 function legendEntry(series){
   const entry=el('span'),dot=el('span','●');
@@ -88,7 +88,7 @@ function timeTicks(start,end,span){
 function drawChart(points,start,end){
   const host=$('chart');host.replaceChildren();
   if(!points.some(p=>p.s))return;
-  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 840 195');svg.setAttribute('role','img');svg.setAttribute('aria-label','Stückpreise in Kupfer im Zeitverlauf');host.append(svg);
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 840 195');svg.setAttribute('role','img');svg.setAttribute('aria-label','Stückpreise in Silber im Zeitverlauf');host.append(svg);
   function shape(tag,attrs,label){
     const node=document.createElementNS(svg.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,String(v));if(label!=null)node.textContent=label;svg.append(node);return node;
   }
@@ -102,8 +102,8 @@ function drawChart(points,start,end){
     }
     shape('line',{x1:xx,x2:xx,y1:145,y2:tick.major?153:149,stroke:tick.major?'#a6b3aa':'#6e827c'});
   }
-  for(const fraction of [0,.5,1]){const v=fraction*max;shape('line',{x1:70,x2:813,y1:y(v),y2:y(v),stroke:'#3a4a49'});shape('text',{x:65,y:y(v)+4,'text-anchor':'end'},number(+v.toFixed(2)))}
-  shape('text',{x:70,y:16},'Kupfer / Stück');
+  for(const fraction of [0,.5,1]){const v=fraction*max;shape('line',{x1:70,x2:813,y1:y(v),y2:y(v),stroke:'#3a4a49'});shape('text',{x:65,y:y(v)+4,'text-anchor':'end'},silverNumber.format(v/100))}
+  shape('text',{x:70,y:16},'Silber / Stück');
   for(const {index,color} of chartSeries){
     let segment=[];
     const paths=[],dots=[];
@@ -120,6 +120,10 @@ function drawChart(points,start,end){
   }
   shape('text',{x:75,y:191},dateTime(start));if(start!==end)shape('text',{x:813,y:191,'text-anchor':'end'},dateTime(end));
 }
+$('currency').onchange=()=>{
+  try{localStorage.setItem('marktchronik.currency',$('currency').value)}catch{}
+  render();drawHistory();
+};
 let period='week';
 const periodTabs=[...document.querySelectorAll('.periods [role="tab"]')];
 function setPeriod(button){

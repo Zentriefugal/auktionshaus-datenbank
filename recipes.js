@@ -49,13 +49,29 @@ let markets=new Map(),results=[],filtered=[],page=0,active=false,loadNumber=0;
 const pageSize=50,items=catalog.items;
 const item=id=>items[id]||'Gegenstand '+id;
 const number=n=>n.toLocaleString('de-DE');
+const silverNumber=new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+try{if(localStorage.getItem('marktchronik.currency')==='coins')$('currency').value='coins'}catch{}
 function money(c){
   if(c==null)return '—';
-  let v=Math.round(Math.abs(c)*100)/100;
-  const g=Math.floor(v/10000),s=Math.floor(v%10000/100),k=Math.round(v%100*100)/100;
-  return (c<0?'−':'')+[g&&g+' G',s&&s+' S',(k||(!g&&!s))?number(k)+' K':''].filter(Boolean).join(' ');
+  const rounded=Math.round(Math.abs(c)),sign=c<0&&rounded?'−':'';
+  const value=el('span',null,'money'),labels=[];
+  function coin(amount,kind,name){
+    const icon=el('span',null,'coin '+kind);
+    icon.setAttribute('aria-hidden','true');
+    value.append(amount,icon);labels.push(amount+' '+name);
+  }
+  value.append(sign);
+  if($('currency').value==='coins'){
+    const gold=Math.floor(rounded/10000),silver=Math.floor(rounded/100)%100,copper=rounded%100;
+    if(gold)coin(number(gold),'gold','Gold');
+    if(silver)coin(number(silver),'silver','Silber');
+    if(copper||!rounded)coin(number(copper),'copper','Kupfer');
+  }else coin(silverNumber.format(rounded/100),'silver','Silber');
+  value.setAttribute('role','img');value.setAttribute('aria-label',sign+labels.join(' '));value.title=sign+labels.join(' ');
+  return value;
 }
-function el(tag,value,cls){const e=document.createElement(tag);if(value!=null)e.textContent=value;if(cls)e.className=cls;return e}
+function el(tag,value,cls){const e=document.createElement(tag);if(value!=null)e.append(value);if(cls)e.className=cls;return e}
+function priceLine(tag,label,c){const line=el(tag,label+' · ');line.append(money(c));return line}
 function option(label,value){const node=el('option',label);node.value=value;return node}
 function recalc(){
   const fee=$('fee').valueAsNumber;
@@ -117,7 +133,7 @@ function render(){
 }
 function branch(parts){
   const ul=el('ul');
-  for(const p of parts){const li=el('li',p.n+' × '+item(p.id)+' · '+(p.batches?p.batches+' × '+p.via:p.via)+' · '+money(p.cost));if(p.parts)li.append(branch(p.parts));ul.append(li)}
+  for(const p of parts){const li=el('li',p.n+' × '+item(p.id)+' · '+(p.batches?p.batches+' × '+p.via:p.via)+' · ');li.append(money(p.cost));if(p.parts)li.append(branch(p.parts));ul.append(li)}
   return ul;
 }
 function show(e){
@@ -125,7 +141,7 @@ function show(e){
   info.append(el('p','Mindestfertigkeit · '+(r.learn??'unbekannt')+' / Gelb ab '+(r.yellow??'unbekannt')+' / Grau ab '+(r.grey??'unbekannt')));
   if($('job').value)info.append(el('p',skillText(r,skillState())));
   if(r.out)info.append(el('p','Ausbeute pro Herstellung · '+r.out[1]+' × '+item(r.out[0])));
-  if(e.parts){info.append(el('strong','Beschaffung für eine Herstellung'),branch(e.parts),el('p','Materialkosten · '+money(e.cost)),el('p',e.price==null?'Verkaufspreis im Scan fehlt.':'AH-Preis (günstigste 5 %) pro Stück · '+money(e.price)),el('p','Erlös nach Gebühr · '+money(e.net)),el('strong','Gewinn · '+money(e.gain)),el('p','Kostendeckender Stückpreis · '+money(e.minimum)))}
+  if(e.parts){info.append(el('strong','Beschaffung für eine Herstellung'),branch(e.parts),priceLine('p','Materialkosten',e.cost),e.price==null?el('p','Verkaufspreis im Scan fehlt.'):priceLine('p','AH-Preis (günstigste 5 %) pro Stück',e.price),priceLine('p','Erlös nach Gebühr',e.net),priceLine('strong','Gewinn',e.gain),priceLine('p','Kostendeckender Stückpreis',e.minimum))}
   else info.append(el('p',e.state));
   $('detail').showModal()
 }
