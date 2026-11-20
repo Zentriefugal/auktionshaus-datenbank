@@ -33,6 +33,36 @@ function choose(){
   const id=/^\d+$/.test(q)?Number(q):exact.length===1?exact[0][0]:$('choices').options.length===1?Number($('choices').value):null;
   chosen=id;drawHistory();
 }
+const chartSeries=[
+  {index:1,color:'#e5bf72',label:'Ø Gesamtangebot'},
+  {index:2,color:'#8bdfae',label:'Ø günstigste 5 % des Volumens'}
+];
+function legendEntry(series){
+  const entry=el('span'),dot=el('span','●');
+  entry.style.display='inline-block';
+  entry.style.marginRight='1.2em';
+  dot.style.color=series.color;dot.setAttribute('aria-hidden','true');
+  entry.append(dot,' '+series.label);return entry;
+}
+function curvePath(segment){
+  if(segment.length<2)return '';
+  const [[firstX,firstY]]=segment;
+  let path='M '+firstX+' '+firstY;
+  if(segment.length===2)return path+' L '+segment[1].join(' ');
+  // Limit the tangent to both neighbouring slopes to avoid overshooting the observed prices.
+  const slopes=segment.slice(1).map(([x,y],i)=>(y-segment[i][1])/(x-segment[i][0]));
+  const tangents=segment.map((point,i)=>{
+    if(i===0)return slopes[0];
+    if(i===slopes.length)return slopes[i-1];
+    const a=slopes[i-1],b=slopes[i];
+    return a*b>0?Math.sign(a)*Math.min(Math.abs(a),Math.abs(b)):0;
+  });
+  for(let i=1;i<segment.length;i++){
+    const [x0,y0]=segment[i-1],[x1,y1]=segment[i],dx=(x1-x0)/3;
+    path+=' C '+[x0+dx,y0+tangents[i-1]*dx,x1-dx,y1-tangents[i]*dx,x1,y1].join(' ');
+  }
+  return path;
+}
 function drawChart(points,start,end){
   const host=$('chart');host.replaceChildren();
   if(!points.some(p=>p.s))return;
@@ -44,14 +74,19 @@ function drawChart(points,start,end){
   const x=t=>end===start?435:76+730*(t-start)/(end-start),y=v=>145-117*v/(max||1);
   for(const fraction of [0,.5,1]){const v=fraction*max;shape('line',{x1:70,x2:813,y1:y(v),y2:y(v),stroke:'#3a4a49'});shape('text',{x:65,y:y(v)+4,'text-anchor':'end'},number(+v.toFixed(2)))}
   shape('text',{x:70,y:16},'Kupfer / Stück');
-  for(const [idx,color] of [[1,'#e5bf72'],[2,'#8bdfae']]){
-    let path='',connected=false;
+  for(const {index,color} of chartSeries){
+    let segment=[];
+    const paths=[],dots=[];
     for(const p of points){
-      if(!p.s){connected=false;continue}
-      const xx=x(p.t),yy=y(p.s[idx]);path+=(connected?' L':' M')+xx+' '+yy;connected=true;
-      shape('circle',{cx:xx,cy:yy,r:3.6,fill:color});
+      if(!p.s){paths.push(curvePath(segment));segment=[];continue}
+      const point=[x(p.t),y(p.s[index])];
+      if(segment.length&&point[0]<=segment.at(-1)[0]){paths.push(curvePath(segment));segment=[]}
+      segment.push(point);dots.push(point);
     }
-    shape('path',{d:path,fill:'none',stroke:color,'stroke-width':2});
+    paths.push(curvePath(segment));
+    const d=paths.filter(Boolean).join(' ');
+    if(d)shape('path',{d,fill:'none',stroke:color,'stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round'});
+    for(const [cx,cy] of dots)shape('circle',{cx,cy,r:3.6,fill:color});
   }
   shape('text',{x:75,y:178},dateTime(start));if(start!==end)shape('text',{x:813,y:178,'text-anchor':'end'},dateTime(end));
 }
@@ -84,7 +119,8 @@ function drawHistory(){
   const end=marketViews.at(-1)?.timestamp??0,start=rangeStart(end);
   const pts=marketViews.filter(v=>v.timestamp>=start).map(v=>({t:v.timestamp,s:v.stats[chosen]})),known=itemNames.has(chosen);
   $('histname').textContent=known?'['+chosen+'] '+itemNames.get(chosen):'Gegenstand auswählen';
-  $('histnote').textContent=known?'Gold: Ø Gesamtangebot · Grün: Ø günstigste 5 % des Volumens.':'Suche nach Name oder Item-ID und wähle einen Treffer.';
+  if(known)$('histnote').replaceChildren(...chartSeries.map(legendEntry));
+  else $('histnote').textContent='Suche nach Name oder Item-ID und wähle einen Treffer.';
   drawChart(known?pts:[],start,end);
   if(known&&!pts.some(p=>p.s))$('chart').textContent='Für diesen Gegenstand gibt es im gewählten Zeitraum kein Angebot.';$('histrows').replaceChildren();
   if(!known)return;
