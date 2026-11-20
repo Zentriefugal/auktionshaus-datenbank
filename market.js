@@ -35,7 +35,7 @@ function choose(){
 }
 const chartSeries=[
   {index:1,color:'#e5bf72',label:'Ø Gesamtangebot'},
-  {index:2,color:'#8bdfae',label:'Ø günstigste 5 % des Volumens'}
+  {index:2,color:'#8bdfae',label:'Ø günstigste 5%'}
 ];
 function legendEntry(series){
   const entry=el('span'),dot=el('span','●');
