@@ -50,7 +50,6 @@ const pageSize=50,items=catalog.items;
 const item=id=>items[id]||'Gegenstand '+id;
 const number=n=>n.toLocaleString('de-DE');
 const silverNumber=new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
-try{if(localStorage.getItem('marktchronik.currency')==='coins')$('currency').value='coins'}catch{}
 function money(c){
   if(c==null)return '—';
   const rounded=Math.round(Math.abs(c)),sign=c<0&&rounded?'−':'';
@@ -61,12 +60,10 @@ function money(c){
     value.append(amount,icon);labels.push(amount+' '+name);
   }
   value.append(sign);
-  if($('currency').value==='coins'){
-    const gold=Math.floor(rounded/10000),silver=Math.floor(rounded/100)%100,copper=rounded%100;
-    if(gold)coin(number(gold),'gold','Gold');
-    if(silver)coin(number(silver),'silver','Silber');
-    if(copper||!rounded)coin(number(copper),'copper','Kupfer');
-  }else coin(silverNumber.format(rounded/100),'silver','Silber');
+  const gold=Math.floor(rounded/10000),silver=Math.floor(rounded/100)%100,copper=rounded%100;
+  if(gold)coin(number(gold),'gold','Gold');
+  if(gold||silver)coin(String(silver).padStart(gold?2:1,'0'),'silver','Silber');
+  coin(String(copper).padStart(gold||silver?2:1,'0'),'copper','Kupfer');
   value.setAttribute('role','img');value.setAttribute('aria-label',sign+labels.join(' '));value.title=sign+labels.join(' ');
   return value;
 }

@@ -35,7 +35,7 @@ function choose(){
 }
 const chartSeries=[
   {index:1,color:'#e5bf72',label:'Ø Gesamtangebot'},
-  {index:2,color:'#8bdfae',label:'Ø günstigste 5 % des Volumens'}
+  {index:2,color:'#8bdfae',label:'Ø günstigste 5%'}
 ];
 function legendEntry(series){
   const entry=el('span'),dot=el('span','●');
@@ -85,15 +85,14 @@ function timeTicks(start,end,span){
   }
   return ticks;
 }
-function drawChart(points,start,end){
+function drawChart(points,start,end,min,max){
   const host=$('chart');host.replaceChildren();
   if(!points.some(p=>p.s))return;
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 840 195');svg.setAttribute('role','img');svg.setAttribute('aria-label','Stückpreise in Silber im Zeitverlauf');host.append(svg);
   function shape(tag,attrs,label){
     const node=document.createElementNS(svg.namespaceURI,tag);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,String(v));if(label!=null)node.textContent=label;svg.append(node);return node;
   }
-  let max=0;for(const p of points)if(p.s)max=Math.max(max,p.s[1],p.s[2]);
-  const x=t=>end===start?435:76+730*(t-start)/(end-start),y=v=>145-117*v/(max||1);
+  const x=t=>end===start?435:76+730*(t-start)/(end-start),y=v=>max===min?86.5:145-117*(v-min)/(max-min);
   for(const tick of timeTicks(start,end,period)){
     const xx=x(tick.t);
     if(tick.major){
@@ -102,7 +101,7 @@ function drawChart(points,start,end){
     }
     shape('line',{x1:xx,x2:xx,y1:145,y2:tick.major?153:149,stroke:tick.major?'#a6b3aa':'#6e827c'});
   }
-  for(const fraction of [0,.5,1]){const v=fraction*max;shape('line',{x1:70,x2:813,y1:y(v),y2:y(v),stroke:'#3a4a49'});shape('text',{x:65,y:y(v)+4,'text-anchor':'end'},silverNumber.format(v/100))}
+  for(const v of new Set([min,min+(max-min)/2,max])){shape('line',{x1:70,x2:813,y1:y(v),y2:y(v),stroke:'#3a4a49'});shape('text',{x:65,y:y(v)+4,'text-anchor':'end'},silverNumber.format(v/100))}
   shape('text',{x:70,y:16},'Silber / Stück');
   for(const {index,color} of chartSeries){
     let segment=[];
@@ -120,10 +119,6 @@ function drawChart(points,start,end){
   }
   shape('text',{x:75,y:191},dateTime(start));if(start!==end)shape('text',{x:813,y:191,'text-anchor':'end'},dateTime(end));
 }
-$('currency').onchange=()=>{
-  try{localStorage.setItem('marktchronik.currency',$('currency').value)}catch{}
-  render();drawHistory();
-};
 let period='week';
 const periodTabs=[...document.querySelectorAll('.periods [role="tab"]')];
 function setPeriod(button){
@@ -155,7 +150,14 @@ function drawHistory(){
   $('histname').textContent=known?'['+chosen+'] '+itemNames.get(chosen):'Gegenstand auswählen';
   if(known)$('histnote').replaceChildren(...chartSeries.map(legendEntry));
   else $('histnote').textContent='Suche nach Name oder Item-ID und wähle einen Treffer.';
-  drawChart(known?pts:[],start,end);
+  let min=Infinity,max=-Infinity;
+  if(known)for(const view of marketViews){
+    const stats=view.stats[chosen];
+    if(!stats)continue;
+    min=Math.min(min,stats[2]); // Ø günstigste 5%
+    max=Math.max(max,stats[1]); // Ø Gesamtangebot
+  }
+  drawChart(known?pts:[],start,end,min,max);
   if(known&&!pts.some(p=>p.s))$('chart').textContent='Für diesen Gegenstand gibt es im gewählten Zeitraum kein Angebot.';$('histrows').replaceChildren();
   if(!known)return;
   for(const p of pts.reverse()){
