@@ -35,7 +35,7 @@ function choose(){
 }
 const chartSeries=[
   {index:1,color:'#e5bf72',label:'Ø Gesamtangebot'},
-  {index:2,color:'#8bdfae',label:'Ø günstigste 5%'}
+  {index:2,color:'#8bdfae',label:'Ø günstigste 5 % des Volumens'}
 ];
 function legendEntry(series){
   const entry=el('span'),dot=el('span','●');
@@ -63,6 +63,28 @@ function curvePath(segment){
   }
   return path;
 }
+const axisFormats={
+  day:new Intl.DateTimeFormat('de-DE',{hour:'2-digit',minute:'2-digit'}),
+  week:new Intl.DateTimeFormat('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}),
+  month:new Intl.DateTimeFormat('de-DE',{day:'2-digit',month:'2-digit'}),
+  year:new Intl.DateTimeFormat('de-DE',{month:'short'})
+};
+function timeTicks(start,end,span){
+  const cursor=new Date(start*1000),ticks=[];
+  cursor.setHours(0,0,0,0);
+  while(cursor.getTime()/1000<=end){
+    const t=cursor.getTime()/1000,hour=cursor.getHours(),monday=cursor.getDay()===1;
+    let major,visible=true;
+    if(span==='day')major=hour%6===0;
+    else if(span==='week'){major=hour===0;visible=hour%6===0}
+    else if(span==='month')major=monday;
+    else{major=cursor.getDate()===1;visible=major||monday}
+    if(t>=start&&visible)ticks.push({t,major,label:major?axisFormats[span].format(cursor):''});
+    if(span==='day'||span==='week')cursor.setTime(cursor.getTime()+3600000);
+    else cursor.setDate(cursor.getDate()+1);
+  }
+  return ticks;
+}
 function drawChart(points,start,end){
   const host=$('chart');host.replaceChildren();
   if(!points.some(p=>p.s))return;
@@ -72,6 +94,14 @@ function drawChart(points,start,end){
   }
   let max=0;for(const p of points)if(p.s)max=Math.max(max,p.s[1],p.s[2]);
   const x=t=>end===start?435:76+730*(t-start)/(end-start),y=v=>145-117*v/(max||1);
+  for(const tick of timeTicks(start,end,period)){
+    const xx=x(tick.t);
+    if(tick.major){
+      shape('line',{x1:xx,x2:xx,y1:28,y2:145,stroke:'#344342','stroke-dasharray':'3 4'});
+      shape('text',{x:xx,y:166,'text-anchor':'middle'},tick.label);
+    }
+    shape('line',{x1:xx,x2:xx,y1:145,y2:tick.major?153:149,stroke:tick.major?'#a6b3aa':'#6e827c'});
+  }
   for(const fraction of [0,.5,1]){const v=fraction*max;shape('line',{x1:70,x2:813,y1:y(v),y2:y(v),stroke:'#3a4a49'});shape('text',{x:65,y:y(v)+4,'text-anchor':'end'},number(+v.toFixed(2)))}
   shape('text',{x:70,y:16},'Kupfer / Stück');
   for(const {index,color} of chartSeries){
@@ -88,7 +118,7 @@ function drawChart(points,start,end){
     if(d)shape('path',{d,fill:'none',stroke:color,'stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round'});
     for(const [cx,cy] of dots)shape('circle',{cx,cy,r:3.6,fill:color});
   }
-  shape('text',{x:75,y:178},dateTime(start));if(start!==end)shape('text',{x:813,y:178,'text-anchor':'end'},dateTime(end));
+  shape('text',{x:75,y:191},dateTime(start));if(start!==end)shape('text',{x:813,y:191,'text-anchor':'end'},dateTime(end));
 }
 let period='week';
 const periodTabs=[...document.querySelectorAll('.periods [role="tab"]')];
