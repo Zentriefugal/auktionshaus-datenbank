@@ -102,7 +102,7 @@ function tab(history){
 $('recipesTab').onclick=()=>tab(false);$('historyTab').onclick=()=>tab(true);$('market').oninput=switchMarket;
 for(const id of ['recipesTab','historyTab'])$(id).onkeydown=e=>{
   if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
-  e.preventDefault();const history=e.key==='End'||(e.key!=='Home'&&id==='recipesTab');
+  e.preventDefault();const history=e.key==='Home'||(e.key!=='End'&&id==='recipesTab');
   tab(history);$(history?'historyTab':'recipesTab').focus();
 };
 let importQueue=Promise.resolve();
